@@ -5,5 +5,14 @@ authors = ["drainiard <drainiard@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "rr8"
+path = "src/rr8/mod.rs"
+
+[[bin]]
+name = "rr8"
+path = "src/bin/main.rs"
 
 [dependencies]
+ggez = "*"
+serde = "1.0"
