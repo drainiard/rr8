@@ -4,23 +4,60 @@ use ggez::event;
 use ggez::graphics;
 use ggez::nalgebra as na;
 
-use rr8::Font;
+use rr8::{palette::Pal, Font, TileMap};
 
-const WIN_W: f32 = 400.;
+const WIN_W: f32 = 288.;
 const WIN_H: f32 = 320.;
+
+const WIN_SCALE: f32 = 2.;
 
 struct MainState {
     font: Font,
+    map: TileMap,
     scale: f32,
+    pos: (u8, u8),
 }
 
 impl MainState {
     fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
         let font = Font::new(ctx)?;
+        let map = TileMap::new(ctx)?;
 
-        let s = MainState { font, scale: 2. };
+        let s = MainState {
+            font,
+            map,
+            scale: WIN_SCALE,
+            pos: (4, 4),
+        };
 
         Ok(s)
+    }
+
+    fn _draw(
+        &mut self,
+        ctx: &mut ggez::Context,
+        drawable: &impl graphics::Drawable,
+        x: f32,
+        y: f32,
+    ) -> ggez::GameResult {
+        graphics::draw(
+            ctx,
+            drawable,
+            graphics::DrawParam::default()
+                .dest(na::Point2::new(x * 16., (16. * y) * self.scale))
+                .scale(na::Vector2::new(self.scale, self.scale)),
+        )
+    }
+
+    fn _draw_text(
+        &mut self,
+        ctx: &mut ggez::Context,
+        text: &str,
+        x: f32,
+        y: f32,
+        pal: Pal,
+    ) -> ggez::GameResult {
+        self._draw(ctx, &self.font.text_batch(text, pal)?, x, y)
     }
 }
 
@@ -30,43 +67,27 @@ impl event::EventHandler for MainState {
     }
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        graphics::clear(ctx, [0.13, 0.12, 0.12, 1.0].into());
+        graphics::clear(ctx, Pal::DarkBlue.darker());
 
-        // let batch = self.font.text_batch("fn init() {\n spr(242, 16, 40);\n}\n");
+        let text = "Hey, you!\nYou're finally awake?";
+        self._draw_text(ctx, text, 2., 17., Pal::White)?;
 
-        let batch = self.font.text_batch(
-            ctx,
-            "Hey, you!\nYou're finally awake?",
-            &graphics::Color::from_rgb(255, 255, 0),
-        )?;
-
-        // graphics::queue_text(
-        //     ctx,
-        //     &batch,
-        //     na::Point2::new(8., 8.),
-        //     Some(graphics::Color::from_rgb(200, 160, 80)),
-        // );
-
-        graphics::draw(
-            ctx,
-            &batch,
-            graphics::DrawParam::default()
-                .dest(na::Point2::new(
-                    16. * self.scale,
-                    WIN_H - 16. * 3. * self.scale,
-                ))
-                .scale(na::Vector2::new(self.scale, self.scale)),
-        )?;
+        self._draw(ctx, &self.map.textbox(18, 4, Pal::Gray)?, 0., 16.)?;
 
         graphics::present(ctx)?;
+
         Ok(())
     }
 }
 
 pub fn main() -> ggez::GameResult {
     let mut cb = ggez::ContextBuilder::new("rr8", "rr8")
-        .window_setup(conf::WindowSetup::default().title("Retro Rust 8-bit IDE"))
-        .window_mode(conf::WindowMode::default().dimensions(WIN_W, WIN_H));
+        .window_setup(
+            conf::WindowSetup::default()
+                .title("Retro Rust 8-bit IDE")
+                .vsync(true),
+        )
+        .window_mode(conf::WindowMode::default().dimensions(WIN_W * WIN_SCALE, WIN_H * WIN_SCALE));
 
     if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
         let mut path = std::path::PathBuf::from(manifest_dir);
