@@ -11,6 +11,7 @@ use graphics::{Color, FilterMode};
 pub mod palette;
 
 const TILESET_PATH: &'static str = "/roguelike-tiles.png";
+const TILESET_ALT_PATH: &'static str = "/unreleased-mcnoodlor.png";
 const FONT_PATH: &'static str = "/roguelike-font-16.png";
 const FONT_MAP: &'static str = "ABCDEFGHIJKLMNOPQRSTUVWXYZÀÀÀÀÇÈÉÈÈÒÒÒÒÙÙÙÙabcdefghijklmnopqrstuvwxyzààààçè#%&@$.,!?:;'\"()[]*/\\+-<=> ";
 const TILE_SIZE: u16 = 16;
@@ -67,79 +68,88 @@ impl Font {
 
 #[derive(Debug, Hash)]
 pub enum TileId {
-    // ===============
-    // Width = 16-bit
-    // ===============
-    // 13 + 13 + 7
     Chars = 1,
-    // 12
+    Chars2,
+    Chars3,
     Expr = 6,
-    // 13
     Fauna = 9,
-    // 4
     Trolls = 12,
-    // 8
     Unliving = 15,
-    // 8
     Creatures = 18,
-    // 16 + 7 + 12
     Building = 21,
-    // 12
+    Building2,
+    Building3,
     Devices = 26,
-    // 13
     Overworld = 29,
-    // 16 + 5
     Explore = 32,
-    // 16 + 6
     Food = 36,
-    // 16 + 11
+    Food2,
     Outfit = 40,
-    // 15
+    Outfit2,
     Magick = 44,
-    // 6
     Music = 47,
-    // 16 + 7
     Sym = 50,
-    // ===============
-    // Width = 8-bit
-    // ===============
-    // 10
+    Sym2,
     Num = 54,
-    // 32 + 11
-    Font = 55,
-    // Ico
+    FontUp = 55,
+    FontUp2,
+    FontLo,
+    FontLo2,
+    FontSy,
     Ico = 60,
+}
+
+pub struct TileLayout {
+    path: &'static str,
+    borders: Vec<[(u16, u16); 6]>,
 }
 
 pub struct TileMap {
     image: graphics::Image,
+    layout: TileLayout,
 }
 
 impl TileMap {
-    pub fn new(ctx: &mut Context) -> GameResult<Self> {
-        let image = Image::new(ctx, TILESET_PATH)?;
-        Ok(Self { image })
+    pub fn new(ctx: &mut Context, layout: TileLayout) -> GameResult<Self> {
+        let image = Image::new(ctx, layout.path)?;
+        Ok(Self { image, layout })
     }
 
-    pub fn tile<C: Into<Color>>(&self, t: TileId, r: u16, o: u16, c: C) -> GameResult<SpriteBatch> {
+    pub fn tile(
+        &self,
+        t: TileId,
+        column: u16,
+        c: impl Into<Color>,
+        tile_width: u16,
+    ) -> GameResult<SpriteBatch> {
         let mut batch = SpriteBatch::new(self.image.clone());
 
-        let rect = self.rect(t, r, o);
+        let rect = self.rect_with_tile_width(t as u16, column, tile_width);
         batch.add(DrawParam::default().color(c.into()).src(rect));
 
         Ok(batch)
     }
 
-    pub fn textbox<C: Into<Color> + Copy>(&self, w: u8, h: u8, c: C) -> GameResult<SpriteBatch> {
+    pub fn textbox(
+        &self,
+        w: u8,
+        h: u8,
+        c: impl Into<Color> + Copy,
+        variant: usize,
+    ) -> GameResult<SpriteBatch> {
         let mut batch = SpriteBatch::new(self.image.clone());
         batch.set_filter(FilterMode::Nearest);
 
         let w_px = (w as f32 - 1.) * TILE_SIZE as f32;
         let h_px = (h as f32 - 1.) * TILE_SIZE as f32;
 
+        let border = self.layout.borders[variant];
+
         let corner_positions = vec![(0., 0.), (w_px, 0.), (0., h_px), (w_px, h_px)];
-        for (o, (x, y)) in (3..8).zip(corner_positions) {
-            let rect = self.rect(TileId::Building, 2, o);
+
+        for (o, (x, y)) in (0..4).zip(corner_positions) {
+            let (row, column) = border[o];
+            let rect = self.rect(row, column);
             batch.add(
                 DrawParam::default()
                     .color(c.into())
@@ -150,7 +160,8 @@ impl TileMap {
         // horizontal edges
         for y in [0., h_px].iter() {
             for dw in 1..w - 1 {
-                let rect = self.rect(TileId::Building, 2, 0);
+                let (row, column) = border[4];
+                let rect = self.rect(row, column);
                 batch.add(
                     DrawParam::default()
                         .color(c.into())
@@ -163,7 +174,8 @@ impl TileMap {
         // vertical edges
         for x in [0., w_px].iter() {
             for dh in 1..h - 1 {
-                let rect = self.rect(TileId::Building, 2, 1);
+                let (row, column) = border[5];
+                let rect = self.rect(row, column);
                 batch.add(
                     DrawParam::default()
                         .color(c.into())
@@ -176,11 +188,15 @@ impl TileMap {
         Ok(batch)
     }
 
-    pub fn rect(&self, tid: TileId, row: u16, offset: u16) -> Rect {
-        let x = offset * TILE_SIZE;
-        let y = (tid as u16 + row) * TILE_SIZE;
+    pub fn rect(&self, row: u16, column: u16) -> Rect {
+        self.rect_with_tile_width(row, column, TILE_SIZE)
+    }
 
-        self.rect_raw(x, y, TILE_SIZE, TILE_SIZE)
+    pub fn rect_with_tile_width(&self, row: u16, column: u16, tile_width: u16) -> Rect {
+        let x = column * tile_width;
+        let y = row * TILE_SIZE;
+
+        self.rect_raw(x, y, tile_width, TILE_SIZE)
     }
 
     fn rect_raw<N: Into<f32>>(&self, x: N, y: N, w: N, h: N) -> Rect {
@@ -191,10 +207,76 @@ impl TileMap {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+pub struct Ui {
+    map: TileMap,
+    map2: TileMap,
+}
+
+impl Ui {
+    pub fn new(ctx: &mut Context) -> GameResult<Self> {
+        let layout = TileLayout {
+            path: TILESET_PATH,
+            borders: vec![[
+                (TileId::Building3 as u16, 3),
+                (TileId::Building3 as u16, 4),
+                (TileId::Building3 as u16, 5),
+                (TileId::Building3 as u16, 6),
+                (TileId::Building3 as u16, 0),
+                (TileId::Building3 as u16, 1),
+            ]],
+        };
+        let layout2 = TileLayout {
+            path: TILESET_ALT_PATH,
+            borders: vec![
+                // top-left, top-right, bottom-left, bottom-right, horiz, vert
+                [(16, 16), (16, 19), (19, 16), (19, 19), (16, 17), (17, 16)],
+                [(16, 20), (16, 23), (19, 20), (19, 23), (16, 21), (17, 20)],
+                [(16, 24), (16, 27), (19, 24), (19, 27), (16, 25), (17, 24)],
+                [(12, 16), (12, 19), (15, 16), (15, 19), (12, 17), (13, 16)],
+                [(12, 20), (12, 23), (15, 20), (15, 23), (12, 21), (13, 20)],
+                [(12, 24), (12, 27), (15, 24), (15, 27), (12, 25), (13, 24)],
+            ],
+        };
+        let map = TileMap::new(ctx, layout)?;
+        let map2 = TileMap::new(ctx, layout2)?;
+
+        Ok(Self { map, map2 })
+    }
+
+    pub fn fill(
+        &self,
+        ctx: &mut Context,
+        w: u8,
+        h: u8,
+        c: impl Into<Color> + Copy,
+    ) -> GameResult<impl graphics::Drawable> {
+        let mode = graphics::DrawMode::fill();
+        let bounds = Rect::new_i32(
+            0,
+            0,
+            w as i32 * TILE_SIZE as i32,
+            h as i32 * TILE_SIZE as i32,
+        );
+        let color = c.into();
+
+        graphics::Mesh::new_rectangle(ctx, mode, bounds, color)
+    }
+
+    pub fn textbox(
+        &self,
+        w: u8,
+        h: u8,
+        c: impl Into<Color> + Copy,
+        variant: usize,
+    ) -> GameResult<SpriteBatch> {
+        self.map2.textbox(w, h, c, variant)
+    }
+
+    pub fn tile(&self, t: TileId, column: u16, c: impl Into<Color>) -> GameResult<SpriteBatch> {
+        self.map.tile(t, column, c, TILE_SIZE)
+    }
+
+    pub fn tile8(&self, t: TileId, column: u16, c: impl Into<Color>) -> GameResult<SpriteBatch> {
+        self.map.tile(t, column, c, TILE_SIZE / 2)
     }
 }
