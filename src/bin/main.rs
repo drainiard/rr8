@@ -3,144 +3,60 @@ use ggez::conf;
 use ggez::event;
 use ggez::graphics;
 
-use rr8::{palette::Pal, Game, TileId, Ui};
+use rr8::{ui::Ui, Game, GameMode};
 
 const WIN_W: f32 = 576.;
 const WIN_H: f32 = 320.;
 
-const WIN_SCALE: f32 = 2.;
+const WIN_SCALE: f32 = 1.;
+
+enum MainMode {
+    Ready,
+    Switch,
+}
 
 struct MainState {
     game: Game,
+    mode: MainMode,
     ui: Ui,
-    dt: u8,
+    dt: u32,
 }
 
 impl MainState {
     fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
         let filter_mode = graphics::FilterMode::Nearest;
         let game = Game::new(ctx)?;
+        let mode = MainMode::Ready;
         let scale = WIN_SCALE;
         let ui = Ui::new(ctx, filter_mode, scale)?;
 
-        let s = MainState { game, ui, dt: 0 };
+        let s = MainState {
+            game,
+            mode,
+            ui,
+            dt: 0,
+        };
 
         Ok(s)
-    }
-
-    fn _draw(
-        &mut self,
-        ctx: &mut ggez::Context,
-        drawable: &impl graphics::Drawable,
-        x: f32,
-        y: f32,
-    ) -> ggez::GameResult {
-        self.ui.draw(ctx, drawable, x, y)
-    }
-
-    fn _draw_text(
-        &mut self,
-        ctx: &mut ggez::Context,
-        text: &str,
-        x: f32,
-        y: f32,
-        color: impl Into<graphics::Color>,
-    ) -> ggez::GameResult {
-        self._draw(ctx, &self.ui.text_batch(text, color.into())?, x, y)
     }
 }
 
 impl event::EventHandler for MainState {
-    fn update(&mut self, _ctx: &mut ggez::Context) -> ggez::GameResult {
+    fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
+        while ggez::timer::check_update_time(ctx, 60) {
+            self.dt += 1;
+        }
+
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
-        graphics::clear(ctx, Pal::Black.darker());
+        graphics::clear(ctx, (0, 0, 0).into());
 
-        self.ui.bg(ctx)?;
+        // UI has its own delta time for animations and stuff
+        self.ui.dt = self.dt;
 
-        let clock_tiles = &[
-            (6, 30),
-            (5, 31),
-            (5, 31),
-            (7, 30),
-            (7, 31),
-            (7, 31),
-            (9, 30),
-            (9, 31),
-            (9, 31),
-            (9, 28),
-            (9, 29),
-            (9, 29),
-            (5, 30),
-            (10, 29),
-            (10, 29),
-            (10, 28),
-            (10, 31),
-            (10, 31),
-            (10, 30),
-            (8, 31),
-            (8, 31),
-            (8, 30),
-            (6, 31),
-            (6, 31),
-        ];
-        let mut hour = 24 * self.dt as u16 / 0xff; // convert u16 into 24h
-        let (clock_row, clock_column) = clock_tiles.get(hour as usize).unwrap_or(&(10, 20));
-        let (meridiem, time_color) = if hour < 12 {
-            ("PM", Pal::Pink)
-        } else {
-            ("AM", Pal::Peach)
-        };
-        // convert to AM/PM format
-        hour = hour % 12;
-        if hour < 1 {
-            hour = 12
-        }
-
-        let clock_tile = self.ui.tile_alt(*clock_row, *clock_column, time_color)?;
-        self._draw(ctx, &clock_tile, 24., 0.)?;
-        self._draw_text(
-            ctx,
-            &format!("{:>2?}{}", hour, meridiem),
-            25.,
-            0.,
-            time_color,
-        )?;
-
-        self._draw(ctx, &self.ui.tile_alt(21, 24, Pal::LightGray)?, 9., 19.)?;
-        self._draw_text(ctx, &self.game.status.clone(), 10., 19., Pal::LightGray)?;
-
-        let mut cursor = 18.;
-        let y = 0.;
-
-        let health = self.ui.tile(TileId::Sym, 5, Pal::Red)?;
-        self._draw(ctx, &health, cursor / 2., y)?;
-        cursor += 2.5;
-
-        self._draw_text(ctx, "99", cursor / 2., y, Pal::Red)?;
-        cursor += 3.;
-
-        let mana = self.ui.tile(TileId::Food2, 4, Pal::Purple)?;
-        self._draw(ctx, &mana, cursor / 2., y)?;
-        cursor += 2.5;
-
-        self._draw_text(ctx, "23", cursor / 2., y, Pal::Purple)?;
-        cursor += 3.;
-
-        let medal = self.ui.tile8(TileId::Ico, 6, Pal::Yellow)?;
-        self._draw(ctx, &medal, cursor / 2., y)?;
-        cursor += 2.5;
-
-        self._draw_text(ctx, "580", cursor / 2., y, Pal::Yellow)?;
-        cursor += 5.;
-
-        let crystal = self.ui.tile(TileId::Explore, 15, Pal::Green)?;
-        self._draw(ctx, &crystal, cursor / 2., y)?;
-        cursor += 2.5;
-
-        self._draw_text(ctx, "34", cursor / 2., y, Pal::Green)?;
+        self.ui.draw_all(ctx, &self.game)?;
 
         graphics::present(ctx)?;
 
@@ -153,13 +69,41 @@ impl event::EventHandler for MainState {
         &mut self,
         ctx: &mut ggez::Context,
         keycode: event::KeyCode,
-        _keymods: event::KeyMods,
+        keymods: event::KeyMods,
         _repeat: bool,
     ) {
-        match keycode {
-            event::KeyCode::Escape => ggez::event::quit(ctx),
-            k => self.game.key_down(ctx, k),
-        };
+        match self.game.mode {
+            GameMode::Normal => {
+                match keycode {
+                    event::KeyCode::Backslash => {
+                        self.mode = MainMode::Switch;
+                        self.game.mode = GameMode::Prompt;
+                    }
+                    event::KeyCode::Escape => ggez::event::quit(ctx),
+                    k => self.game.key_down(ctx, keycode, keymods),
+                    // k => println!("Pressed {:?}", k),
+                };
+            }
+            GameMode::Prompt => {
+                match keycode {
+                    event::KeyCode::Return => self.game.run_prompt(),
+                    event::KeyCode::Escape => self.game.mode = GameMode::Normal,
+                    k => self.game.key_down(ctx, keycode, keymods),
+                    // k => println!("Pressed {:?}", k),
+                };
+            }
+        }
+    }
+
+    fn text_input_event(&mut self, _ctx: &mut ggez::Context, c: char) {
+        if let MainMode::Switch = self.mode {
+            self.mode = MainMode::Ready;
+            return;
+        }
+
+        if let GameMode::Prompt = self.game.mode {
+            self.game.update_prompt(c);
+        }
     }
 }
 
