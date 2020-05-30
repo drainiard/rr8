@@ -4,9 +4,10 @@ use ggez;
 use ggez::error::GameResult;
 use ggez::graphics;
 use ggez::graphics::{spritebatch::SpriteBatch, DrawParam, Image, Rect};
-use ggez::nalgebra::Point2;
-use ggez::Context;
+use ggez::nalgebra::{Point2, Vector2};
+use ggez::{event, Context};
 use graphics::{Color, Drawable, FilterMode};
+use palette::Pal;
 
 pub mod palette;
 
@@ -117,6 +118,12 @@ pub enum TileId {
     Ico = 60,
 }
 
+impl Into<u16> for TileId {
+    fn into(self) -> u16 {
+        self as u16
+    }
+}
+
 pub struct TileLayout {
     path: &'static str,
     borders: Vec<[(u16, u16); 6]>,
@@ -147,14 +154,14 @@ impl TileMap {
 
     pub fn tile(
         &self,
-        t: TileId,
+        t: impl Into<u16>,
         column: u16,
         c: impl Into<Color>,
         tile_width: u16,
     ) -> GameResult<SpriteBatch> {
         let mut batch = self.batch();
 
-        let rect = self.rect_with_tile_width(t as u16, column, tile_width);
+        let rect = self.rect_with_tile_width(t.into(), column, tile_width);
         batch.add(DrawParam::default().color(c.into()).src(rect));
 
         Ok(batch)
@@ -162,7 +169,7 @@ impl TileMap {
 
     pub fn fill(
         &self,
-        t: TileId,
+        row: impl Into<u16>,
         column: u16,
         w: u8,
         h: u8,
@@ -171,7 +178,7 @@ impl TileMap {
     ) -> GameResult<SpriteBatch> {
         let mut batch = self.batch();
 
-        let rect = self.rect_with_tile_width(t as u16, column, tile_width);
+        let rect = self.rect_with_tile_width(row.into(), column, tile_width);
         for x in 0..w {
             for y in 0..h {
                 batch.add(
@@ -266,12 +273,15 @@ impl TileMap {
 }
 
 pub struct Ui {
+    font: Font,
     map: TileMap,
     map2: TileMap,
+    scale: f32,
 }
 
 impl Ui {
-    pub fn new(ctx: &mut Context, filter_mode: FilterMode) -> GameResult<Self> {
+    pub fn new(ctx: &mut Context, filter_mode: FilterMode, scale: f32) -> GameResult<Self> {
+        let font = Font::new(ctx, filter_mode)?;
         let layout = TileLayout {
             path: TILESET_PATH,
             borders: vec![[
@@ -298,7 +308,45 @@ impl Ui {
         let map = TileMap::new(ctx, layout, filter_mode)?;
         let map2 = TileMap::new(ctx, layout2, filter_mode)?;
 
-        Ok(Self { map, map2 })
+        Ok(Self {
+            font,
+            map,
+            map2,
+            scale,
+        })
+    }
+
+    pub fn bg(&self, ctx: &mut Context) -> GameResult {
+        let mesh = self.mesh(ctx, 36, 18, Pal::DarkBlue.darker())?;
+        self.draw(ctx, &mesh, 0., 1.)?;
+
+        let mesh = self.mesh(ctx, 18, 18, Pal::DarkBlue.dark())?;
+        self.draw(ctx, &mesh, 9., 1.)?;
+
+        let fill = self.fill_alt(0, 5, 1, 18, Pal::DarkBlue.dark())?;
+        self.draw(ctx, &fill, 8.5, 1.0)?;
+        self.draw(ctx, &fill, 26.5, 1.0)?;
+
+        Ok(())
+    }
+
+    pub fn draw(
+        &self,
+        ctx: &mut ggez::Context,
+        drawable: &impl graphics::Drawable,
+        x: f32,
+        y: f32,
+    ) -> ggez::GameResult {
+        graphics::draw(
+            ctx,
+            drawable,
+            graphics::DrawParam::default()
+                .dest(Point2::new(
+                    x * TILE_SIZE as f32 * self.scale,
+                    y * TILE_SIZE as f32 * self.scale,
+                ))
+                .scale(Vector2::new(self.scale, self.scale)),
+        )
     }
 
     pub fn mesh(
@@ -338,6 +386,10 @@ impl Ui {
         self.map.tile(t, column, c, TILE_SIZE / 2)
     }
 
+    pub fn tile_alt(&self, row: u16, column: u16, c: impl Into<Color>) -> GameResult<SpriteBatch> {
+        self.map2.tile(row, column, c, TILE_SIZE)
+    }
+
     pub fn fill8(
         &self,
         t: TileId,
@@ -347,5 +399,75 @@ impl Ui {
         c: impl Into<Color> + Copy,
     ) -> GameResult<SpriteBatch> {
         self.map.fill(t, column, w, h, c, TILE_SIZE / 2)
+    }
+
+    pub fn fill_alt(
+        &self,
+        row: u16,
+        column: u16,
+        w: u8,
+        h: u8,
+        c: impl Into<Color> + Copy,
+    ) -> GameResult<SpriteBatch> {
+        self.map2.fill(row, column, w, h, c, TILE_SIZE)
+    }
+
+    pub fn text_batch(
+        &self,
+        text: &str,
+        color: impl Into<Color> + Copy,
+    ) -> GameResult<SpriteBatch> {
+        self.font.text_batch(text, color)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Btn {
+    Up,
+    Down,
+    Left,
+    Right,
+    A,
+    B,
+    Start,
+    Select,
+    L1,
+    R1,
+    X,
+    Y,
+}
+
+#[derive(Debug, Default)]
+pub struct Game {
+    pub status: String,
+}
+
+impl Game {
+    pub fn new(_ctx: &mut Context) -> GameResult<Self> {
+        Ok(Self::default())
+    }
+
+    pub fn set_status(&mut self, text: String) {
+        self.status = text;
+    }
+
+    pub fn key_down(&mut self, ctx: &mut Context, keycode: event::KeyCode) {
+        let result = match keycode {
+            event::KeyCode::Z => self._key_down(ctx, Btn::A),
+            event::KeyCode::X => self._key_down(ctx, Btn::B),
+            event::KeyCode::A => self._key_down(ctx, Btn::L1),
+            event::KeyCode::S => self._key_down(ctx, Btn::R1),
+            event::KeyCode::C => self._key_down(ctx, Btn::Start),
+            event::KeyCode::V => self._key_down(ctx, Btn::Select),
+            _ => return,
+        };
+
+        if let Ok(k) = result {
+            self.set_status(format!("Pressed {}", k));
+        }
+    }
+
+    pub fn _key_down(&mut self, _ctx: &mut Context, btn: Btn) -> GameResult<String> {
+        Ok(format!("{:?}", btn))
     }
 }
