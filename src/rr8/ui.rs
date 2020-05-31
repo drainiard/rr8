@@ -76,7 +76,7 @@ impl Font {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum TileId {
     Chars = 1,
     Chars2,
@@ -146,15 +146,23 @@ impl TileMap {
 
     pub fn tile(
         &self,
-        t: impl Into<u16>,
+        t: impl Into<u16> + Copy + std::fmt::Debug,
         column: u16,
-        c: impl Into<Color>,
+        c: impl Into<Color> + Copy,
         tile_width: u16,
+        flip: bool,
     ) -> GameResult<SpriteBatch> {
         let mut batch = self.batch();
 
         let rect = self.rect_with_tile_width(t.into(), column, tile_width);
-        batch.add(DrawParam::default().color(c.into()).src(rect));
+
+        let mut param = DrawParam::default().color(c.into()).src(rect);
+        if flip {
+            param = param
+                .rotation(std::f32::consts::PI)
+                .offset(Point2::new(0.9, 0.9));
+        }
+        batch.add(param);
 
         Ok(batch)
     }
@@ -264,6 +272,22 @@ impl TileMap {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum Scale {
+    Default,
+    Up,
+    Down,
+    Min,
+    Max,
+}
+
+impl Scale {
+    pub const DELTA: f32 = 0.5;
+    pub const DEFAULT: f32 = Self::DELTA * 2.;
+    pub const MIN: f32 = Self::DELTA;
+    pub const MAX: f32 = Self::DELTA * 7.;
+}
+
 pub struct Ui {
     pub dt: u32,
     font: Font,
@@ -310,19 +334,17 @@ impl Ui {
     }
 
     pub fn draw_all(&self, ctx: &mut Context, game: &Game) -> GameResult {
-        graphics::clear(ctx, Pal::Black.into());
-
         self.bg(ctx)?;
         self.draw_prompt(ctx, game)?;
-        self.draw_topbar(ctx)?;
+        self.draw_topbar(ctx, game)?;
 
         Ok(())
     }
 
     pub fn draw_prompt(&self, ctx: &mut Context, game: &Game) -> GameResult {
         if let GameMode::Prompt = game.mode {
-            let column = if self.dt & 0b10000 > 0 { 15 } else { 20 };
-            let beam = self.tile8(TileId::Ico, column, Pal::Red)?;
+            let column = if self.dt & 0b100000 > 0 { 15 } else { 20 };
+            let beam = self.tile8(TileId::Ico, column, Pal::Red, false)?;
 
             let (cursor_pos, prompt) = game.get_prompt();
 
@@ -337,15 +359,22 @@ impl Ui {
         Ok(())
     }
 
-    pub fn draw_topbar(&self, ctx: &mut Context) -> GameResult {
-        self.draw(ctx, &self.tile_alt(1, 16, Pal::Green)?, 9., 0.)?;
-        self.draw(ctx, &self.tile_alt(5, 16, Pal::Black)?, 9., 0.)?;
-        self.draw_text(ctx, "READY", 10.5, 0., Pal::LightGray)?;
+    pub fn draw_topbar(&self, ctx: &mut Context, game: &Game) -> GameResult {
+        let (bg, fg, ico, bg_color, fg_color) = match game.mode {
+            GameMode::Normal => (1, 5, 16, Pal::Black, Pal::Green),
+            GameMode::Prompt => (1, 6, 26, Pal::Orange, Pal::Black),
+        };
+        self.draw(ctx, &self.tile_alt(bg, ico, fg_color, false)?, 9., 0.)?;
+        self.draw(ctx, &self.tile_alt(fg, ico, bg_color, false)?, 9., 0.)?;
+        self.draw_text(ctx, &p(&game.mode).to_uppercase(), 10.5, 0., Pal::LightGray)?;
 
         Ok(())
     }
 
     pub fn bg(&self, ctx: &mut Context) -> GameResult {
+        let mesh = self.mesh(ctx, 19, 20, Pal::Black)?;
+        self.draw(ctx, &mesh, 8.5, 0.)?;
+
         let mesh = self.mesh(ctx, 18, 18, Pal::DarkBlue.dark())?;
         self.draw(ctx, &mesh, 9., 1.)?;
 
@@ -415,16 +444,34 @@ impl Ui {
         self.map2.textbox(w, h, c, variant)
     }
 
-    pub fn tile(&self, t: TileId, column: u16, c: impl Into<Color>) -> GameResult<SpriteBatch> {
-        self.map.tile(t, column, c, TILE_SIZE)
+    pub fn tile(
+        &self,
+        t: TileId,
+        column: u16,
+        c: impl Into<Color> + Copy,
+        flip: bool,
+    ) -> GameResult<SpriteBatch> {
+        self.map.tile(t, column, c, TILE_SIZE, flip)
     }
 
-    pub fn tile8(&self, t: TileId, column: u16, c: impl Into<Color>) -> GameResult<SpriteBatch> {
-        self.map.tile(t, column, c, TILE_SIZE / 2)
+    pub fn tile8(
+        &self,
+        t: TileId,
+        column: u16,
+        c: impl Into<Color> + Copy,
+        flip: bool,
+    ) -> GameResult<SpriteBatch> {
+        self.map.tile(t, column, c, TILE_SIZE / 2, flip)
     }
 
-    pub fn tile_alt(&self, row: u16, column: u16, c: impl Into<Color>) -> GameResult<SpriteBatch> {
-        self.map2.tile(row, column, c, TILE_SIZE)
+    pub fn tile_alt(
+        &self,
+        row: u16,
+        column: u16,
+        c: impl Into<Color> + Copy,
+        flip: bool,
+    ) -> GameResult<SpriteBatch> {
+        self.map2.tile(row, column, c, TILE_SIZE, flip)
     }
 
     pub fn fill8(
@@ -455,5 +502,33 @@ impl Ui {
         color: impl Into<Color> + Copy,
     ) -> GameResult<SpriteBatch> {
         self.font.text_batch(text, color)
+    }
+
+    pub fn get_scale(&self) -> f32 {
+        self.scale
+    }
+
+    pub fn set_scale(&mut self, scale: Scale) {
+        match scale {
+            Scale::Up => {
+                if self.scale < Scale::MAX {
+                    self.scale += Scale::DELTA
+                }
+            }
+            Scale::Down => {
+                if self.scale > Scale::MIN {
+                    self.scale -= Scale::DELTA
+                }
+            }
+            Scale::Min => {
+                self.scale = Scale::MIN;
+            }
+            Scale::Max => {
+                self.scale = Scale::MAX;
+            }
+            Scale::Default => {
+                self.scale = Scale::DEFAULT;
+            }
+        }
     }
 }

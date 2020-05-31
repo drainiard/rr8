@@ -3,12 +3,15 @@ use ggez::conf;
 use ggez::event;
 use ggez::graphics;
 
-use rr8::{ui::Ui, Game, GameMode};
+use rr8::{
+    ui::{Scale, Ui},
+    Game, GameMode,
+};
 
 const WIN_W: f32 = 576.;
 const WIN_H: f32 = 320.;
 
-const WIN_SCALE: f32 = 1.;
+const WIN_SCALE: f32 = Scale::DEFAULT + Scale::DELTA * 2.;
 
 enum MainMode {
     Ready,
@@ -18,21 +21,22 @@ enum MainMode {
 struct MainState {
     game: Game,
     mode: MainMode,
+    scale: f32,
     ui: Ui,
     dt: u32,
 }
 
 impl MainState {
-    fn new(ctx: &mut ggez::Context) -> ggez::GameResult<MainState> {
+    fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState> {
         let filter_mode = graphics::FilterMode::Nearest;
         let game = Game::new(ctx)?;
         let mode = MainMode::Ready;
-        let scale = WIN_SCALE;
         let ui = Ui::new(ctx, filter_mode, scale)?;
 
         let s = MainState {
             game,
             mode,
+            scale,
             ui,
             dt: 0,
         };
@@ -53,6 +57,22 @@ impl event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         graphics::clear(ctx, (0, 0, 0).into());
 
+        let scale = self.ui.get_scale();
+        if self.scale != scale {
+            self.scale = scale;
+            let (w, h) = (WIN_W * scale, WIN_H * scale);
+            graphics::set_mode(
+                ctx,
+                conf::WindowMode::default()
+                    .dimensions(w, h)
+                    .min_dimensions(w, h)
+                    .max_dimensions(w, h)
+                    .resizable(true),
+            )?;
+            graphics::set_screen_coordinates(ctx, graphics::Rect::new(0., 0., w, h))?;
+            println!("Update Scale to {}", scale);
+        }
+
         // UI has its own delta time for animations and stuff
         self.ui.dt = self.dt;
 
@@ -72,12 +92,29 @@ impl event::EventHandler for MainState {
         keymods: event::KeyMods,
         _repeat: bool,
     ) {
+        let alt = keymods.contains(event::KeyMods::ALT);
+        let ctrl = keymods.contains(event::KeyMods::CTRL);
+        let logo = keymods.contains(event::KeyMods::LOGO);
+        let shift = keymods.contains(event::KeyMods::SHIFT);
+
         match self.game.mode {
             GameMode::Normal => {
                 match keycode {
                     event::KeyCode::Backslash => {
                         self.mode = MainMode::Switch;
                         self.game.mode = GameMode::Prompt;
+                    }
+                    event::KeyCode::Key0 => {
+                        if ctrl {
+                            self.ui.set_scale(Scale::Default)
+                        }
+                    }
+                    event::KeyCode::Add => {
+                        self.ui.set_scale(if logo { Scale::Max } else { Scale::Up })
+                    }
+                    event::KeyCode::Subtract => {
+                        self.ui
+                            .set_scale(if logo { Scale::Min } else { Scale::Down })
                     }
                     event::KeyCode::Escape => ggez::event::quit(ctx),
                     k => self.game.key_down(ctx, keycode, keymods),
@@ -108,13 +145,14 @@ impl event::EventHandler for MainState {
 }
 
 pub fn main() -> ggez::GameResult {
+    let scale = WIN_SCALE;
     let mut cb = ggez::ContextBuilder::new("rr8", "rr8")
         .window_setup(
             conf::WindowSetup::default()
                 .title("Retro Rust 8-bit IDE")
                 .vsync(true),
         )
-        .window_mode(conf::WindowMode::default().dimensions(WIN_W * WIN_SCALE, WIN_H * WIN_SCALE));
+        .window_mode(conf::WindowMode::default().dimensions(WIN_W * scale, WIN_H * scale));
 
     if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
         let mut path = std::path::PathBuf::from(manifest_dir);
@@ -123,6 +161,6 @@ pub fn main() -> ggez::GameResult {
     }
 
     let (ctx, event_loop) = &mut cb.build()?;
-    let state = &mut MainState::new(ctx)?;
+    let state = &mut MainState::new(ctx, scale)?;
     event::run(ctx, event_loop, state)
 }
