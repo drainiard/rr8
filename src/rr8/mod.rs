@@ -13,6 +13,39 @@ const TILESET_PATH: &'static str = "/roguelike-tiles.png";
 const TILESET_ALT_PATH: &'static str = "/unreleased-mcnoodlor.png";
 const TILE_SIZE: u16 = 16;
 
+#[derive(Copy, Clone, Debug)]
+pub enum TileId {
+    Chars = 1,
+    Chars2,
+    Chars3,
+    Expr = 6,
+    Fauna = 9,
+    Trolls = 12,
+    Unliving = 15,
+    Creatures = 18,
+    Building = 21,
+    Building2,
+    Building3,
+    Devices = 26,
+    Overworld = 29,
+    Explore = 32,
+    Food = 36,
+    Food2,
+    Outfit = 40,
+    Outfit2,
+    Magick = 44,
+    Music = 47,
+    Sym = 50,
+    Sym2,
+    Num = 54,
+    FontUp = 55,
+    FontUp2,
+    FontLo,
+    FontLo2,
+    FontSy,
+    Ico = 60,
+}
+
 const CLOCK_TILES: [(u8, u8); 24] = [
     (6, 30),
     (5, 31),
