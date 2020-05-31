@@ -74,7 +74,7 @@ pub struct Game {
     status: String,
 }
 
-const NORMAL_MODE_STATUS: &str = "Press \\ to use prompt";
+const NORMAL_MODE_STATUS: &str = "<Esc> to use prompt";
 
 impl Game {
     pub fn new(_ctx: &mut Context) -> GameResult<Self> {
@@ -148,31 +148,34 @@ impl Game {
     }
 
     pub fn update_prompt(&mut self, c: char) {
-        if !c.is_ascii_control() {
-            self.status.insert(self.cursor, c);
-            self.cursor += 1;
-            return;
-        }
-
-        let count = self.status.chars().count();
-        let i = self
+        let byte_cursor = self
             .status
             .chars()
             .take(self.cursor)
             .collect::<String>()
             .len();
 
-        if c == 0x7F as char && i < count {
+        if !c.is_ascii_control() {
+            self.status.insert(byte_cursor, c);
+            self.cursor += 1;
+            return;
+        } else if c == 0x7F as char && byte_cursor < self.status.len() {
             // Del
-            self.status.remove(i);
-            if self.cursor > 0 && i == count - 1 {
+            self.status.remove(byte_cursor);
+            if self.cursor > 0 && byte_cursor >= self.status.len() {
                 // we deleted the last char, let's move cursor back as well
                 self.cursor -= 1;
             }
-        } else if c == 0x08 as char && i > 0 {
+        } else if c == 0x08 as char && byte_cursor > 0 {
             // Backspace
             self.cursor -= 1;
-            self.status.remove(i - 1);
+            let byte_cursor = self
+                .status
+                .chars()
+                .take(self.cursor)
+                .collect::<String>()
+                .len();
+            self.status.remove(byte_cursor);
         }
     }
 

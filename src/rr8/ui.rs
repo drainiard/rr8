@@ -341,46 +341,59 @@ impl Ui {
         Ok(())
     }
 
+    pub fn bg(&self, ctx: &mut Context) -> GameResult {
+        let mesh = self.mesh(ctx, 20, 20, Pal::Off)?;
+        self.draw(ctx, &mesh, 0., 0.)?;
+
+        let mesh = self.mesh(ctx, 19, 18, Pal::DarkBlue.dark())?;
+        self.draw(ctx, &mesh, 0.5, 1.)?;
+
+        let fill = self.fill_alt(0, 5, 1, 18, Pal::DarkBlue.dark())?;
+        self.draw(ctx, &fill, -0.5, 1.)?;
+        self.draw(ctx, &fill, 19.5, 1.)?;
+
+        Ok(())
+    }
+
     pub fn draw_prompt(&self, ctx: &mut Context, game: &Game) -> GameResult {
-        if let GameMode::Prompt = game.mode {
-            let column = if self.dt & 0b100000 > 0 { 15 } else { 20 };
-            let beam = self.tile8(TileId::Ico, column, Pal::Red, false)?;
+        let (prompt_color, prompt_text) = match &game.mode {
+            GameMode::Normal => (Pal::Gray.dark(), game.get_status()),
+            GameMode::Prompt => {
+                let column = if self.dt & 0b100000 > 0 { 15 } else { 20 };
+                let beam = self.tile8(TileId::Ico, column, Pal::Red, false)?;
 
-            let (cursor_pos, prompt) = game.get_prompt();
+                let (cursor_pos, prompt) = game.get_prompt();
 
-            self.draw(ctx, &beam, 10. + cursor_pos as f32 / 2., 19.)?;
-            self.draw_text(ctx, ">", 9., 19., Pal::LightGray)?;
-        } else {
-            self.draw_text(ctx, "#", 9., 19., Pal::LightGray)?;
-        }
+                // this also works nice because drawing the beam before the
+                // prompt makes the char underneath it visible
+                self.draw(ctx, &beam, 2. + cursor_pos as f32 / 2., 19.)?;
 
-        self.draw_text(ctx, &game.get_status(), 10., 19., Pal::LightGray)?;
+                (Pal::LightGray.into(), prompt)
+            }
+        };
+        self.draw_text(ctx, "#", 1., 19., Pal::Gray.dark())?;
+        self.draw_text(ctx, prompt_text, 2., 19., prompt_color)?;
 
         Ok(())
     }
 
     pub fn draw_topbar(&self, ctx: &mut Context, game: &Game) -> GameResult {
+        let default_color = Pal::Gray.dark();
         let (bg, fg, ico, bg_color, fg_color) = match game.mode {
-            GameMode::Normal => (1, 5, 16, Pal::Black, Pal::Green),
-            GameMode::Prompt => (1, 6, 26, Pal::Orange, Pal::Black),
+            GameMode::Normal => (1, 5, 16, Pal::Black, default_color),
+            GameMode::Prompt => (1, 5, 16, Pal::Black, Pal::Green.into()),
         };
-        self.draw(ctx, &self.tile_alt(bg, ico, fg_color, false)?, 9., 0.)?;
-        self.draw(ctx, &self.tile_alt(fg, ico, bg_color, false)?, 9., 0.)?;
-        self.draw_text(ctx, &p(&game.mode).to_uppercase(), 10.5, 0., Pal::LightGray)?;
+        self.draw(ctx, &self.tile_alt(bg, ico, fg_color, false)?, 1., 0.)?;
+        self.draw(ctx, &self.tile_alt(fg, ico, bg_color, false)?, 1., 0.)?;
+        self.draw_text(ctx, &p(&game.mode).to_uppercase(), 2.5, 0., default_color)?;
 
-        Ok(())
-    }
-
-    pub fn bg(&self, ctx: &mut Context) -> GameResult {
-        let mesh = self.mesh(ctx, 19, 20, Pal::Black)?;
-        self.draw(ctx, &mesh, 8.5, 0.)?;
-
-        let mesh = self.mesh(ctx, 18, 18, Pal::DarkBlue.dark())?;
-        self.draw(ctx, &mesh, 9., 1.)?;
-
-        let fill = self.fill_alt(0, 5, 1, 18, Pal::DarkBlue.dark())?;
-        self.draw(ctx, &fill, 8.5, 1.0)?;
-        self.draw(ctx, &fill, 26.5, 1.0)?;
+        self.draw_text(
+            ctx,
+            &format!("x{}", self.scale),
+            18.,
+            0.,
+            Pal::Gray.darker(),
+        )?;
 
         Ok(())
     }

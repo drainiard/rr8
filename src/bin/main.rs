@@ -8,7 +8,7 @@ use rr8::{
     Game, GameMode,
 };
 
-const WIN_W: f32 = 576.;
+const WIN_W: f32 = 320.;
 const WIN_H: f32 = 320.;
 
 const WIN_SCALE: f32 = Scale::DEFAULT + Scale::DELTA * 2.;
@@ -97,10 +97,12 @@ impl event::EventHandler for MainState {
         let logo = keymods.contains(event::KeyMods::LOGO);
         let shift = keymods.contains(event::KeyMods::SHIFT);
 
+        println!("{:?}", (keymods, keycode));
+
         match self.game.mode {
             GameMode::Normal => {
                 match keycode {
-                    event::KeyCode::Backslash => {
+                    event::KeyCode::Escape => {
                         self.mode = MainMode::Switch;
                         self.game.mode = GameMode::Prompt;
                     }
@@ -116,17 +118,19 @@ impl event::EventHandler for MainState {
                         self.ui
                             .set_scale(if logo { Scale::Min } else { Scale::Down })
                     }
-                    event::KeyCode::Escape => ggez::event::quit(ctx),
-                    k => self.game.key_down(ctx, keycode, keymods),
-                    // k => println!("Pressed {:?}", k),
+                    event::KeyCode::W => {
+                        if ctrl {
+                            ggez::event::quit(ctx)
+                        }
+                    }
+                    _ => self.game.key_down(ctx, keycode, keymods),
                 };
             }
             GameMode::Prompt => {
                 match keycode {
                     event::KeyCode::Return => self.game.run_prompt(),
                     event::KeyCode::Escape => self.game.mode = GameMode::Normal,
-                    k => self.game.key_down(ctx, keycode, keymods),
-                    // k => println!("Pressed {:?}", k),
+                    _ => self.game.key_down(ctx, keycode, keymods),
                 };
             }
         }
