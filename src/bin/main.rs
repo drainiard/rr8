@@ -4,7 +4,7 @@ use ggez::event;
 use ggez::graphics;
 
 use rr8::{
-    ui::{Scale, Ui},
+    ui::{self, Scale, Ui},
     Game, GameMode,
 };
 
@@ -31,6 +31,7 @@ impl<'a> MainState<'a> {
         let filter_mode = graphics::FilterMode::Nearest;
         let game = Game::new(ctx)?;
         let mode = MainMode::Ready;
+
         let ui = Ui::new(ctx, filter_mode, scale)?;
 
         let s = MainState {
@@ -87,7 +88,7 @@ impl event::EventHandler for MainState<'_> {
 
     fn mouse_motion_event(&mut self, ctx: &mut ggez::Context, x: f32, y: f32, _dx: f32, _dy: f32) {
         ggez::input::mouse::set_cursor_hidden(ctx, true);
-        self.ui.set_mouse(x, y);
+        self.ui.set_mouse_coords((x, y));
     }
 
     fn key_down_event(
@@ -170,6 +171,14 @@ pub fn main() -> ggez::GameResult {
     }
 
     let (ctx, event_loop) = &mut cb.build()?;
+
     let state = &mut MainState::new(ctx, scale)?;
+
+    let prompt = &mut ui::Prompt::default();
+    state.ui.add_draw_system(prompt);
+
+    let top_bar = &mut ui::TopBar::default();
+    state.ui.add_draw_system(top_bar);
+
     event::run(ctx, event_loop, state)
 }

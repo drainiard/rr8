@@ -33,9 +33,8 @@ pub trait Draw {
     fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult;
 }
 
-pub struct TopBar {
-    x: u8,
-}
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct TopBar;
 
 impl Draw for TopBar {
     fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
@@ -54,17 +53,72 @@ impl Draw for TopBar {
     }
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub struct Mouse {
+    coords: (f32, f32),
+}
+
+impl Mouse {
+    pub fn set_coords(&mut self, coords: (f32, f32)) {
+        self.coords = coords;
+    }
+}
+
+impl Draw for Mouse {
+    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
+        if let GameMode::Normal = game.mode {
+            let (x, y) = self.coords;
+
+            let mouse = ui.tile_alt(9, 16, Pal::Orange, false)?;
+            let mouse_inner = ui.tile_alt(9, 19, Pal::Red, false)?;
+            let mouse_shadow = ui.tile_alt(9, 19, Pal::Black, false)?;
+            ui.draw_free(ctx, &mouse_shadow, x + 1., y + 2., ui.scale)?;
+            ui.draw_free(ctx, &mouse_inner, x, y, ui.scale)?;
+            ui.draw_free(ctx, &mouse, x, y, ui.scale)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct Prompt;
+
+impl Draw for Prompt {
+    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
+        let (prompt_color, prompt_text) = match &game.mode {
+            GameMode::Normal => (Pal::Gray.dark(), game.get_status()),
+            GameMode::Prompt => {
+                let column = if ui.dt & 0b100000 > 0 { 15 } else { 20 };
+                let beam = ui.tile8(TileId::Ico, column, Pal::Red, false)?;
+
+                let (cursor_pos, prompt) = game.get_prompt();
+
+                // this also works nice because drawing the beam before the
+                // prompt makes the char underneath it visible
+                ui.draw(ctx, &beam, 2. + cursor_pos as f32 / 2., 19.)?;
+
+                (Pal::LightGray.into(), prompt)
+            }
+        };
+        ui.draw_text(ctx, "#", 1., 19., Pal::Gray.dark())?;
+        ui.draw_text(ctx, prompt_text, 2., 19., prompt_color)?;
+
+        Ok(())
+    }
+}
+
 pub struct Ui<'a> {
     pub dt: u32,
     font: Font,
     map: TileMap,
     map2: TileMap,
-    mouse: (f32, f32),
+    mouse: Mouse,
     scale: f32,
     systems: Vec<&'a dyn Draw>,
 }
 
-impl Ui<'_> {
+impl<'a> Ui<'a> {
     pub fn new(ctx: &mut Context, filter_mode: FilterMode, scale: f32) -> GameResult<Self> {
         let font = Font::new(ctx, filter_mode)?;
         let layout = TileLayout::new(
@@ -92,9 +146,9 @@ impl Ui<'_> {
         let map = TileMap::new(ctx, layout, filter_mode)?;
         let map2 = TileMap::new(ctx, layout2, filter_mode)?;
 
-        let mouse = (0., 0.);
+        let mouse = Mouse::default();
 
-        let systems: Vec<&dyn Draw> = vec![&TopBar { x: 123 }];
+        let systems: Vec<&dyn Draw> = Vec::new();
 
         Ok(Self {
             dt: 0,
@@ -107,13 +161,19 @@ impl Ui<'_> {
         })
     }
 
+    pub fn add_draw_system<'b: 'a>(&mut self, system: &'b mut impl Draw) {
+        self.systems.push(system);
+    }
+
     pub fn draw_all(&self, ctx: &mut Context, game: &Game) -> GameResult {
         self.bg(ctx)?;
-        self.draw_prompt(ctx, game)?;
-        self.draw_topbar(ctx, game)?;
 
-        // mouse as last so it's above everything
-        self.draw_mouse(ctx, game)?;
+        for system in self.systems.iter() {
+            system.draw(ctx, self, game)?;
+        }
+
+        // draw mouse last so it's above everything else
+        self.mouse.draw(ctx, self, game)?;
 
         Ok(())
     }
@@ -130,67 +190,6 @@ impl Ui<'_> {
         self.draw(ctx, &fill, 19.5, 1.)?;
 
         Ok(())
-    }
-
-    pub fn draw_prompt(&self, ctx: &mut Context, game: &Game) -> GameResult {
-        let (prompt_color, prompt_text) = match &game.mode {
-            GameMode::Normal => (Pal::Gray.dark(), game.get_status()),
-            GameMode::Prompt => {
-                let column = if self.dt & 0b100000 > 0 { 15 } else { 20 };
-                let beam = self.tile8(TileId::Ico, column, Pal::Red, false)?;
-
-                let (cursor_pos, prompt) = game.get_prompt();
-
-                // this also works nice because drawing the beam before the
-                // prompt makes the char underneath it visible
-                self.draw(ctx, &beam, 2. + cursor_pos as f32 / 2., 19.)?;
-
-                (Pal::LightGray.into(), prompt)
-            }
-        };
-        self.draw_text(ctx, "#", 1., 19., Pal::Gray.dark())?;
-        self.draw_text(ctx, prompt_text, 2., 19., prompt_color)?;
-
-        Ok(())
-    }
-
-    pub fn draw_topbar(&self, ctx: &mut Context, game: &Game) -> GameResult {
-        let default_color = Pal::Gray.dark();
-        let (bg, fg, ico, bg_color, fg_color) = match game.mode {
-            GameMode::Normal => (1, 5, 16, Pal::Black, default_color),
-            GameMode::Prompt => (1, 5, 16, Pal::Black, Pal::Green.into()),
-        };
-        self.draw(ctx, &self.tile_alt(bg, ico, fg_color, false)?, 1., 0.)?;
-        self.draw(ctx, &self.tile_alt(fg, ico, bg_color, false)?, 1., 0.)?;
-        self.draw_text(ctx, &p(&game.mode).to_uppercase(), 2.5, 0., default_color)?;
-
-        self.draw_text(
-            ctx,
-            &format!("x{}", self.scale),
-            18.,
-            0.,
-            Pal::Gray.darker(),
-        )?;
-
-        Ok(())
-    }
-
-    pub fn draw_mouse(&self, ctx: &mut Context, game: &Game) -> GameResult {
-        if let GameMode::Normal = game.mode {
-            let (x, y) = self.mouse;
-            let mouse = self.tile_alt(9, 16, Pal::Orange, false)?;
-            let mouse_inner = self.tile_alt(9, 19, Pal::Red, false)?;
-            let mouse_shadow = self.tile_alt(9, 19, Pal::Black, false)?;
-            self.draw_free(ctx, &mouse_shadow, x + 1., y + 2., self.scale)?;
-            self.draw_free(ctx, &mouse_inner, x, y, self.scale)?;
-            self.draw_free(ctx, &mouse, x, y, self.scale)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn set_mouse(&mut self, x: f32, y: f32) {
-        self.mouse = (x, y);
     }
 
     pub fn draw(
@@ -324,6 +323,10 @@ impl Ui<'_> {
         color: impl Into<Color> + Copy,
     ) -> GameResult<SpriteBatch> {
         self.font.text_batch(text, color)
+    }
+
+    pub fn set_mouse_coords(&mut self, coords: (f32, f32)) {
+        self.mouse.set_coords(coords);
     }
 
     pub fn get_scale(&self) -> f32 {

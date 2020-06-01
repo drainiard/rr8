@@ -5,7 +5,13 @@ use ggez::error::GameResult;
 use ggez::{event, Context};
 
 const FONT_PATH: &'static str = "/roguelike-font-16.png";
-const FONT_MAP: &'static str = "ABCDEFGHIJKLMNOPQRSTUVWXYZÀÀÀÀÇÈÉÈÈÒÒÒÒÙÙÙÙabcdefghijklmnopqrstuvwxyzààààçè#%&@$.,!?:;'\"()[]*/\\+-<=>0123456789 ";
+const FONT_MAP: &'static str = "\
+ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+ÀÁÂÄÇÈÉÊËÒòÔÖÙùÛÜ\
+abcdefghijklmnopqrstuvwxyz\
+àáâäçè\
+#%&@$.,!?:;'\"()[]*/\\+-<=>\
+0123456789 ";
 const FONT_WIDTH: u16 = 8;
 const FONT_HEIGHT: u16 = 16;
 
