@@ -18,16 +18,16 @@ enum MainMode {
     Switch,
 }
 
-struct MainState {
+struct MainState<'a> {
     game: Game,
     mode: MainMode,
     scale: f32,
-    ui: Ui,
+    ui: Ui<'a>,
     dt: u32,
 }
 
-impl MainState {
-    fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState> {
+impl<'a> MainState<'a> {
+    fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState<'a>> {
         let filter_mode = graphics::FilterMode::Nearest;
         let game = Game::new(ctx)?;
         let mode = MainMode::Ready;
@@ -45,7 +45,7 @@ impl MainState {
     }
 }
 
-impl event::EventHandler for MainState {
+impl event::EventHandler for MainState<'_> {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         while ggez::timer::check_update_time(ctx, 60) {
             self.dt += 1;
@@ -83,6 +83,11 @@ impl event::EventHandler for MainState {
         std::thread::yield_now();
 
         Ok(())
+    }
+
+    fn mouse_motion_event(&mut self, ctx: &mut ggez::Context, x: f32, y: f32, _dx: f32, _dy: f32) {
+        ggez::input::mouse::set_cursor_hidden(ctx, true);
+        self.ui.set_mouse(x, y);
     }
 
     fn key_down_event(

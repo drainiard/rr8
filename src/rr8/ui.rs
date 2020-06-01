@@ -29,15 +29,42 @@ impl Scale {
     pub const MAX: f32 = Self::DELTA * 7.;
 }
 
-pub struct Ui {
+pub trait Draw {
+    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult;
+}
+
+pub struct TopBar {
+    x: u8,
+}
+
+impl Draw for TopBar {
+    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
+        let default_color = Pal::Gray.dark();
+        let (bg, fg, ico, bg_color, fg_color) = match game.mode {
+            GameMode::Normal => (1, 5, 16, Pal::Black, default_color),
+            GameMode::Prompt => (1, 5, 16, Pal::Black, Pal::Green.into()),
+        };
+        ui.draw(ctx, &ui.tile_alt(bg, ico, fg_color, false)?, 1., 0.)?;
+        ui.draw(ctx, &ui.tile_alt(fg, ico, bg_color, false)?, 1., 0.)?;
+        ui.draw_text(ctx, &p(&game.mode).to_uppercase(), 2.5, 0., default_color)?;
+
+        ui.draw_text(ctx, &format!("x{}", ui.scale), 18., 0., Pal::Gray.darker())?;
+
+        Ok(())
+    }
+}
+
+pub struct Ui<'a> {
     pub dt: u32,
     font: Font,
     map: TileMap,
     map2: TileMap,
+    mouse: (f32, f32),
     scale: f32,
+    systems: Vec<&'a dyn Draw>,
 }
 
-impl Ui {
+impl Ui<'_> {
     pub fn new(ctx: &mut Context, filter_mode: FilterMode, scale: f32) -> GameResult<Self> {
         let font = Font::new(ctx, filter_mode)?;
         let layout = TileLayout::new(
@@ -65,12 +92,18 @@ impl Ui {
         let map = TileMap::new(ctx, layout, filter_mode)?;
         let map2 = TileMap::new(ctx, layout2, filter_mode)?;
 
+        let mouse = (0., 0.);
+
+        let systems: Vec<&dyn Draw> = vec![&TopBar { x: 123 }];
+
         Ok(Self {
             dt: 0,
             font,
             map,
             map2,
+            mouse,
             scale,
+            systems,
         })
     }
 
@@ -79,6 +112,9 @@ impl Ui {
         self.draw_prompt(ctx, game)?;
         self.draw_topbar(ctx, game)?;
 
+        // mouse as last so it's above everything
+        self.draw_mouse(ctx, game)?;
+
         Ok(())
     }
 
@@ -86,10 +122,10 @@ impl Ui {
         let mesh = self.mesh(ctx, 20, 20, Pal::Off)?;
         self.draw(ctx, &mesh, 0., 0.)?;
 
-        let mesh = self.mesh(ctx, 19, 18, Pal::DarkBlue.dark())?;
+        let mesh = self.mesh(ctx, 19, 18, Pal::Gray)?;
         self.draw(ctx, &mesh, 0.5, 1.)?;
 
-        let fill = self.fill_alt(0, 5, 1, 18, Pal::DarkBlue.dark())?;
+        let fill = self.fill_alt(0, 5, 1, 18, Pal::Gray.dark())?;
         self.draw(ctx, &fill, -0.5, 1.)?;
         self.draw(ctx, &fill, 19.5, 1.)?;
 
@@ -139,6 +175,24 @@ impl Ui {
         Ok(())
     }
 
+    pub fn draw_mouse(&self, ctx: &mut Context, game: &Game) -> GameResult {
+        if let GameMode::Normal = game.mode {
+            let (x, y) = self.mouse;
+            let mouse = self.tile_alt(9, 16, Pal::Orange, false)?;
+            let mouse_inner = self.tile_alt(9, 19, Pal::Red, false)?;
+            let mouse_shadow = self.tile_alt(9, 19, Pal::Black, false)?;
+            self.draw_free(ctx, &mouse_shadow, x + 1., y + 2., self.scale)?;
+            self.draw_free(ctx, &mouse_inner, x, y, self.scale)?;
+            self.draw_free(ctx, &mouse, x, y, self.scale)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn set_mouse(&mut self, x: f32, y: f32) {
+        self.mouse = (x, y);
+    }
+
     pub fn draw(
         &self,
         ctx: &mut ggez::Context,
@@ -146,15 +200,29 @@ impl Ui {
         x: f32,
         y: f32,
     ) -> ggez::GameResult {
+        self.draw_free(
+            ctx,
+            drawable,
+            x * TILE_SIZE as f32 * self.scale,
+            y * TILE_SIZE as f32 * self.scale,
+            self.scale,
+        )
+    }
+
+    pub fn draw_free(
+        &self,
+        ctx: &mut ggez::Context,
+        drawable: &impl graphics::Drawable,
+        x: f32,
+        y: f32,
+        scale: f32,
+    ) -> ggez::GameResult {
         graphics::draw(
             ctx,
             drawable,
             graphics::DrawParam::default()
-                .dest(Point2::new(
-                    x * TILE_SIZE as f32 * self.scale,
-                    y * TILE_SIZE as f32 * self.scale,
-                ))
-                .scale(Vector2::new(self.scale, self.scale)),
+                .dest(Point2::new(x, y))
+                .scale(Vector2::new(scale, scale)),
         )
     }
 
