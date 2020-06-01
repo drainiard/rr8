@@ -29,14 +29,19 @@ impl Scale {
     pub const MAX: f32 = Self::DELTA * 7.;
 }
 
-pub trait Draw {
+pub trait System {
+    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult;
     fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult;
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct TopBar;
 
-impl Draw for TopBar {
+impl System for TopBar {
+    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
+        todo!()
+    }
+
     fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
         let default_color = Pal::Gray.dark();
         let (bg, fg, ico, bg_color, fg_color) = match game.mode {
@@ -64,7 +69,11 @@ impl Mouse {
     }
 }
 
-impl Draw for Mouse {
+impl System for Mouse {
+    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
+        todo!()
+    }
+
     fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
         if let GameMode::Normal = game.mode {
             let (x, y) = self.coords;
@@ -84,7 +93,10 @@ impl Draw for Mouse {
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct Prompt;
 
-impl Draw for Prompt {
+impl System for Prompt {
+    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
+        todo!()
+    }
     fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
         let (prompt_color, prompt_text) = match &game.mode {
             GameMode::Normal => (Pal::Gray.dark(), game.get_status()),
@@ -108,17 +120,17 @@ impl Draw for Prompt {
     }
 }
 
-pub struct Ui<'a> {
+pub struct Ui {
     pub dt: u32,
     font: Font,
     map: TileMap,
     map2: TileMap,
     mouse: Mouse,
     scale: f32,
-    systems: Vec<&'a dyn Draw>,
+    systems: Vec<Box<dyn System>>,
 }
 
-impl<'a> Ui<'a> {
+impl Ui {
     pub fn new(ctx: &mut Context, filter_mode: FilterMode, scale: f32) -> GameResult<Self> {
         let font = Font::new(ctx, filter_mode)?;
         let layout = TileLayout::new(
@@ -148,7 +160,7 @@ impl<'a> Ui<'a> {
 
         let mouse = Mouse::default();
 
-        let systems: Vec<&dyn Draw> = Vec::new();
+        let systems: Vec<Box<dyn System>> = Vec::new();
 
         Ok(Self {
             dt: 0,
@@ -161,8 +173,8 @@ impl<'a> Ui<'a> {
         })
     }
 
-    pub fn add_draw_system<'b: 'a>(&mut self, system: &'b mut impl Draw) {
-        self.systems.push(system);
+    pub fn add_system<S: 'static + System>(&mut self, system: S) {
+        self.systems.push(Box::new(system));
     }
 
     pub fn draw_all(&self, ctx: &mut Context, game: &Game) -> GameResult {

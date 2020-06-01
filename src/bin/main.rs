@@ -18,16 +18,16 @@ enum MainMode {
     Switch,
 }
 
-struct MainState<'a> {
+struct MainState {
     game: Game,
     mode: MainMode,
     scale: f32,
-    ui: Ui<'a>,
+    ui: Ui,
     dt: u32,
 }
 
-impl<'a> MainState<'a> {
-    fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState<'a>> {
+impl MainState {
+    fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState> {
         let filter_mode = graphics::FilterMode::Nearest;
         let game = Game::new(ctx)?;
         let mode = MainMode::Ready;
@@ -46,7 +46,7 @@ impl<'a> MainState<'a> {
     }
 }
 
-impl event::EventHandler for MainState<'_> {
+impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         while ggez::timer::check_update_time(ctx, 60) {
             self.dt += 1;
@@ -98,10 +98,7 @@ impl event::EventHandler for MainState<'_> {
         keymods: event::KeyMods,
         _repeat: bool,
     ) {
-        let alt = keymods.contains(event::KeyMods::ALT);
-        let ctrl = keymods.contains(event::KeyMods::CTRL);
         let logo = keymods.contains(event::KeyMods::LOGO);
-        let shift = keymods.contains(event::KeyMods::SHIFT);
 
         println!("{:?}", (keymods, keycode));
 
@@ -112,22 +109,12 @@ impl event::EventHandler for MainState<'_> {
                         self.mode = MainMode::Switch;
                         self.game.mode = GameMode::Prompt;
                     }
-                    event::KeyCode::Key0 => {
-                        if ctrl {
-                            self.ui.set_scale(Scale::Default)
-                        }
-                    }
                     event::KeyCode::Add => {
                         self.ui.set_scale(if logo { Scale::Max } else { Scale::Up })
                     }
                     event::KeyCode::Subtract => {
                         self.ui
                             .set_scale(if logo { Scale::Min } else { Scale::Down })
-                    }
-                    event::KeyCode::W => {
-                        if ctrl {
-                            ggez::event::quit(ctx)
-                        }
                     }
                     _ => self.game.key_down(ctx, keycode, keymods),
                 };
@@ -174,11 +161,10 @@ pub fn main() -> ggez::GameResult {
 
     let state = &mut MainState::new(ctx, scale)?;
 
-    let prompt = &mut ui::Prompt::default();
-    state.ui.add_draw_system(prompt);
-
-    let top_bar = &mut ui::TopBar::default();
-    state.ui.add_draw_system(top_bar);
+    let prompt = ui::Prompt::default();
+    let top_bar = ui::TopBar::default();
+    state.ui.add_system(prompt);
+    state.ui.add_system(top_bar);
 
     event::run(ctx, event_loop, state)
 }
