@@ -43,10 +43,16 @@ pub struct Ui {
     scale: f32,
     default_scale: f32,
     systems: Vec<Box<dyn System>>,
+    win: Rect,
 }
 
 impl Ui {
-    pub fn new(ctx: &mut Context, filter_mode: FilterMode, scale: f32) -> GameResult<Self> {
+    pub fn new(
+        ctx: &mut Context,
+        filter_mode: FilterMode,
+        win: Rect,
+        scale: f32,
+    ) -> GameResult<Self> {
         let font = Font::new(ctx, filter_mode)?;
         let layout = TileLayout::new(
             TILESET_PATH,
@@ -77,6 +83,8 @@ impl Ui {
 
         let systems: Vec<Box<dyn System>> = Vec::new();
 
+        Self::validate_rect(win)?;
+
         Ok(Self {
             dt: 0,
             font,
@@ -86,7 +94,21 @@ impl Ui {
             scale,
             default_scale: scale,
             systems,
+            win,
         })
+    }
+
+    fn validate_rect(rect: Rect) -> GameResult {
+        let unit = TILE_SIZE as f32;
+
+        if rect.x % unit > 0. || rect.y % unit > 0. || rect.w % unit > 0. || rect.h % unit > 0. {
+            Err(ggez::GameError::WindowError(format!(
+                "{:?} Not a multiple of {}",
+                rect, TILE_SIZE
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn add_system<S: 'static + System>(&mut self, system: S) {
@@ -94,7 +116,13 @@ impl Ui {
     }
 
     pub fn draw_all(&self, ctx: &mut Context, game: &Game) -> GameResult {
-        self.bg(ctx)?;
+        // window
+        let mesh = self.mesh(ctx, self.win.w as u8, self.win.w as u8, Pal::Off)?;
+        self.draw(ctx, &mesh, 0., 0.)?;
+
+        // body
+        let mesh = self.mesh(ctx, 20, 18, Pal::Gray)?;
+        self.draw(ctx, &mesh, 0., 1.)?;
 
         for system in self.systems.iter() {
             system.draw(ctx, game)?;
@@ -102,20 +130,6 @@ impl Ui {
 
         // draw mouse last so it's above everything else
         self.mouse.draw(ctx, game)?;
-
-        Ok(())
-    }
-
-    pub fn bg(&self, ctx: &mut Context) -> GameResult {
-        let mesh = self.mesh(ctx, 20, 20, Pal::Off)?;
-        self.draw(ctx, &mesh, 0., 0.)?;
-
-        let mesh = self.mesh(ctx, 19, 18, Pal::Gray)?;
-        self.draw(ctx, &mesh, 0.5, 1.)?;
-
-        let fill = self.fill_alt(0, 5, 1, 18, Pal::Gray.dark())?;
-        self.draw(ctx, &fill, -0.5, 1.)?;
-        self.draw(ctx, &fill, 19.5, 1.)?;
 
         Ok(())
     }

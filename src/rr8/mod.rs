@@ -17,9 +17,9 @@ abcdefghijklmnopqrstuvwxyz\
 const FONT_WIDTH: u16 = 8;
 const FONT_HEIGHT: u16 = 16;
 
+pub const TILE_SIZE: u16 = 16;
 const TILESET_PATH: &'static str = "/roguelike-tiles.png";
 const TILESET_ALT_PATH: &'static str = "/unreleased-mcnoodlor.png";
-const TILE_SIZE: u16 = 16;
 
 #[derive(Copy, Clone, Debug)]
 pub enum TileId {

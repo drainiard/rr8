@@ -1,15 +1,16 @@
 use ggez;
 use ggez::conf;
 use ggez::event;
-use ggez::graphics;
+use ggez::{graphics, Context, ContextBuilder, GameResult};
 
+use graphics::Rect;
 use rr8::{
     ui::{prompt::Prompt, topbar::TopBar, Scale, Ui},
-    Game, GameMode,
+    Game, GameMode, TILE_SIZE,
 };
 
-const WIN_W: f32 = 320.;
-const WIN_H: f32 = 320.;
+const WIN_W: f32 = 20. * TILE_SIZE as f32;
+const WIN_H: f32 = 20. * TILE_SIZE as f32;
 
 const WIN_SCALE: f32 = Scale::DEFAULT + Scale::DELTA * 2.;
 
@@ -26,11 +27,12 @@ struct MainState {
 }
 
 impl MainState {
-    fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState> {
+    fn new(ctx: &mut Context, scale: f32) -> GameResult<MainState> {
         let filter_mode = graphics::FilterMode::Nearest;
         let mode = MainMode::Ready;
 
-        let ui = Ui::new(ctx, filter_mode, scale)?;
+        let win = Rect::new(0., 0., WIN_W, WIN_H);
+        let ui = Ui::new(ctx, filter_mode, win, scale)?;
         let game = Game::new(ctx, ui)?;
 
         let s = MainState {
@@ -50,7 +52,7 @@ impl MainState {
 }
 
 impl event::EventHandler for MainState {
-    fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
         while ggez::timer::check_update_time(ctx, 60) {
             self.dt += 1;
         }
@@ -58,7 +60,7 @@ impl event::EventHandler for MainState {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
         graphics::clear(ctx, (0, 0, 0).into());
 
         let scale = self.game.ui.get_scale();
@@ -73,7 +75,7 @@ impl event::EventHandler for MainState {
                     .max_dimensions(w, h)
                     .resizable(true),
             )?;
-            graphics::set_screen_coordinates(ctx, graphics::Rect::new(0., 0., w, h))?;
+            graphics::set_screen_coordinates(ctx, Rect::new(0., 0., w, h))?;
             println!("Update Scale to {}", scale);
         }
 
@@ -84,19 +86,16 @@ impl event::EventHandler for MainState {
 
         graphics::present(ctx)?;
 
-        std::thread::yield_now();
-
         Ok(())
     }
 
-    fn mouse_motion_event(&mut self, ctx: &mut ggez::Context, x: f32, y: f32, _dx: f32, _dy: f32) {
-        ggez::input::mouse::set_cursor_hidden(ctx, true);
+    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32, _dx: f32, _dy: f32) {
         self.game.ui.set_mouse_coords((x, y));
     }
 
     fn key_down_event(
         &mut self,
-        ctx: &mut ggez::Context,
+        ctx: &mut Context,
         keycode: event::KeyCode,
         keymods: event::KeyMods,
         _repeat: bool,
@@ -147,7 +146,7 @@ impl event::EventHandler for MainState {
         }
     }
 
-    fn text_input_event(&mut self, _ctx: &mut ggez::Context, c: char) {
+    fn text_input_event(&mut self, _ctx: &mut Context, c: char) {
         if let MainMode::Switch = self.mode {
             self.mode = MainMode::Ready;
             return;
@@ -159,9 +158,9 @@ impl event::EventHandler for MainState {
     }
 }
 
-pub fn main() -> ggez::GameResult {
+pub fn main() -> GameResult {
     let scale = WIN_SCALE;
-    let mut cb = ggez::ContextBuilder::new("rr8", "rr8")
+    let mut cb = ContextBuilder::new("rr8", "rr8")
         .window_setup(
             conf::WindowSetup::default()
                 .title("Retro Rust 8-bit IDE")
