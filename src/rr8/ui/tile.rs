@@ -5,6 +5,7 @@ use ggez::nalgebra::Point2;
 use ggez::Context;
 
 use crate::*;
+use graphics::Drawable;
 
 impl Into<u16> for TileId {
     fn into(self) -> u16 {
@@ -15,13 +16,11 @@ impl Into<u16> for TileId {
 #[derive(Debug)]
 pub struct TileLayout {
     path: &'static str,
-    /// top-left, top-right, bottom-left, bottom-right, horiz, vert
-    borders: Vec<[(u16, u16); 6]>,
 }
 
 impl TileLayout {
-    pub(crate) fn new(path: &'static str, borders: Vec<[(u16, u16); 6]>) -> Self {
-        Self { path, borders }
+    pub(crate) fn new(path: &'static str) -> Self {
+        Self { path }
     }
 }
 
@@ -94,63 +93,6 @@ impl TileMap {
                             x as f32 * tile_width as f32,
                             y as f32 * TILE_SIZE as f32,
                         )),
-                );
-            }
-        }
-
-        Ok(batch)
-    }
-
-    pub fn textbox(
-        &self,
-        w: u8,
-        h: u8,
-        c: impl Into<Color> + Copy,
-        variant: usize,
-    ) -> GameResult<SpriteBatch> {
-        let mut batch = self.batch();
-
-        let w_px = (w as f32 - 1.) * TILE_SIZE as f32;
-        let h_px = (h as f32 - 1.) * TILE_SIZE as f32;
-
-        let border = self.layout.borders[variant];
-
-        let corner_positions = vec![(0., 0.), (w_px, 0.), (0., h_px), (w_px, h_px)];
-
-        for (o, (x, y)) in (0..4).zip(corner_positions) {
-            let (row, column) = border[o];
-            let rect = self.rect(row, column);
-            batch.add(
-                DrawParam::default()
-                    .color(c.into())
-                    .src(rect)
-                    .dest(Point2::new(x, y)),
-            );
-        }
-        // horizontal edges
-        for y in [0., h_px].iter() {
-            for dw in 1..w - 1 {
-                let (row, column) = border[4];
-                let rect = self.rect(row, column);
-                batch.add(
-                    DrawParam::default()
-                        .color(c.into())
-                        .src(rect)
-                        .dest(Point2::new((dw as u16 * TILE_SIZE) as f32, *y)),
-                );
-            }
-        }
-
-        // vertical edges
-        for x in [0., w_px].iter() {
-            for dh in 1..h - 1 {
-                let (row, column) = border[5];
-                let rect = self.rect(row, column);
-                batch.add(
-                    DrawParam::default()
-                        .color(c.into())
-                        .src(rect)
-                        .dest(Point2::new(*x, (dh as u16 * TILE_SIZE) as f32)),
                 );
             }
         }

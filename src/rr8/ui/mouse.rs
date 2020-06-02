@@ -42,7 +42,7 @@ impl System for Mouse {
                 let tile = ui.tile_alt(tx, ty, hover_color, false)?;
                 ui.draw(ctx, &tile, dx + ox, dy + oy)?;
 
-                ui.draw_text(ctx, &p((dx, dy, x, y)), 1., 19., Pal::Blue)?;
+                ui.draw_text(ctx, &p((dx, dy, x, y)), 1., 19., Pal::DarkBlue)?;
             }
         }
 

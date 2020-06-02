@@ -46,7 +46,6 @@ impl MainState {
     }
 
     fn switch_mode(&mut self, mode: GameMode) {
-        self.mode = MainMode::Switch;
         self.game.mode = mode;
     }
 }
@@ -109,7 +108,7 @@ impl event::EventHandler for MainState {
         match keycode {
             event::KeyCode::F1 => self.switch_mode(GameMode::Normal),
             event::KeyCode::F2 => self.switch_mode(GameMode::Prompt),
-            event::KeyCode::Escape => ggez::event::quit(ctx),
+            //event::KeyCode::Escape => ggez::event::quit(ctx),
             _ => {
                 is_done = false;
             }
@@ -147,11 +146,6 @@ impl event::EventHandler for MainState {
     }
 
     fn text_input_event(&mut self, _ctx: &mut Context, c: char) {
-        if let MainMode::Switch = self.mode {
-            self.mode = MainMode::Ready;
-            return;
-        }
-
         if let GameMode::Prompt = self.game.mode {
             self.game.update_prompt(c);
         }

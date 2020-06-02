@@ -38,13 +38,21 @@ impl Pal {
     pub fn darker(self) -> Color {
         self.darken(0.75)
     }
+
+    pub fn light(self) -> Color {
+        self.darken(-0.5)
+    }
+
+    pub fn lighter(self) -> Color {
+        self.darken(-0.75)
+    }
 }
 
 impl Into<Color> for Pal {
     fn into(self) -> Color {
         match self {
             Self::Off => Color::from((0x06, 0x08, 0x08)),
-            Self::Black => Color::from((0x12, 0x16, 0x14)),
+            Self::Black => Color::from((0x10, 0x11, 0x11)),
             Self::DarkBlue => Color::from((0x1D, 0x2B, 0x53)),
             Self::Purple => Color::from((0x7E, 0x25, 0x53)),
             Self::DarkGreen => Color::from((0x00, 0x87, 0x51)),

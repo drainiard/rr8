@@ -54,28 +54,8 @@ impl Ui {
         scale: f32,
     ) -> GameResult<Self> {
         let font = Font::new(ctx, filter_mode)?;
-        let layout = TileLayout::new(
-            TILESET_PATH,
-            vec![[
-                (TileId::Building3 as u16, 3),
-                (TileId::Building3 as u16, 4),
-                (TileId::Building3 as u16, 5),
-                (TileId::Building3 as u16, 6),
-                (TileId::Building3 as u16, 0),
-                (TileId::Building3 as u16, 1),
-            ]],
-        );
-        let layout2 = TileLayout::new(
-            TILESET_ALT_PATH,
-            vec![
-                [(16, 16), (16, 19), (19, 16), (19, 19), (16, 17), (17, 16)],
-                [(16, 20), (16, 23), (19, 20), (19, 23), (16, 21), (17, 20)],
-                [(16, 24), (16, 27), (19, 24), (19, 27), (16, 25), (17, 24)],
-                [(12, 16), (12, 19), (15, 16), (15, 19), (12, 17), (13, 16)],
-                [(12, 20), (12, 23), (15, 20), (15, 23), (12, 21), (13, 20)],
-                [(12, 24), (12, 27), (15, 24), (15, 27), (12, 25), (13, 24)],
-            ],
-        );
+        let layout = TileLayout::new(TILESET_PATH);
+        let layout2 = TileLayout::new(TILESET_ALT_PATH);
         let map = TileMap::new(ctx, layout, filter_mode)?;
         let map2 = TileMap::new(ctx, layout2, filter_mode)?;
 
@@ -121,12 +101,17 @@ impl Ui {
         self.draw(ctx, &mesh, 0., 0.)?;
 
         // body
-        let mesh = self.mesh(ctx, 20, 18, Pal::Gray)?;
+        let mesh = self.mesh(ctx, 20, 18, Pal::DarkBlue.dark())?;
         self.draw(ctx, &mesh, 0., 1.)?;
 
         for system in self.systems.iter() {
             system.draw(ctx, game)?;
         }
+
+        self.draw_textbox(ctx, 1., 2., 18., 1., Pal::DarkBlue)?;
+        self.draw_textbox(ctx, 1., 4., 18., 14., Pal::DarkBlue)?;
+
+        self.draw_text(ctx, "Rust Retro 8-bit", 6., 2., Pal::Blue)?;
 
         // draw mouse last so it's above everything else
         self.mouse.draw(ctx, game)?;
@@ -178,6 +163,25 @@ impl Ui {
         self.draw(ctx, &self.text_batch(text, color.into())?, x, y)
     }
 
+    pub fn draw_textbox(
+        &self,
+        ctx: &mut Context,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        color: impl Into<Color> + Copy,
+    ) -> GameResult {
+        let fx = x * TILE_SIZE as f32 * self.scale;
+        let fy = y * TILE_SIZE as f32 * self.scale;
+        let fw = w * TILE_SIZE as f32;
+        let fh = h * TILE_SIZE as f32;
+
+        let bg = self.mesh_free(ctx, fw, fh, color)?;
+
+        self.draw_free(ctx, &bg, fx, fy, self.scale)
+    }
+
     pub fn mesh(
         &self,
         ctx: &mut Context,
@@ -185,26 +189,26 @@ impl Ui {
         h: u8,
         c: impl Into<Color>,
     ) -> GameResult<impl Drawable> {
+        self.mesh_free(
+            ctx,
+            w as f32 * TILE_SIZE as f32,
+            h as f32 * TILE_SIZE as f32,
+            c,
+        )
+    }
+
+    pub fn mesh_free(
+        &self,
+        ctx: &mut Context,
+        w: f32,
+        h: f32,
+        c: impl Into<Color>,
+    ) -> GameResult<impl Drawable> {
         let mode = graphics::DrawMode::fill();
-        let bounds = Rect::new_i32(
-            0,
-            0,
-            w as i32 * TILE_SIZE as i32,
-            h as i32 * TILE_SIZE as i32,
-        );
+        let bounds = Rect::new(0., 0., w, h);
         let color = c.into();
 
         graphics::Mesh::new_rectangle(ctx, mode, bounds, color)
-    }
-
-    pub fn textbox(
-        &self,
-        w: u8,
-        h: u8,
-        c: impl Into<Color> + Copy,
-        variant: usize,
-    ) -> GameResult<SpriteBatch> {
-        self.map2.textbox(w, h, c, variant)
     }
 
     pub fn tile(

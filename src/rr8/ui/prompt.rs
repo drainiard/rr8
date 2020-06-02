@@ -21,7 +21,7 @@ impl System for Prompt {
             // prompt makes the char underneath it visible
             ui.draw(ctx, &beam, 2. + cursor_pos as f32 / 2., 19.)?;
 
-            let (prompt_color, prompt_text) = (Pal::LightGray, prompt);
+            let (prompt_color, prompt_text) = (Pal::Blue, prompt);
 
             ui.draw_text(ctx, "#", 1., 19., Pal::Gray.dark())?;
             ui.draw_text(ctx, prompt_text, 2., 19., prompt_color)?;
