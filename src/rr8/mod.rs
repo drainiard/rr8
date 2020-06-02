@@ -4,6 +4,8 @@ use ggez;
 use ggez::error::GameResult;
 use ggez::{event, Context};
 
+pub(crate) use ui::{palette::Pal, Ui};
+
 const FONT_PATH: &'static str = "/roguelike-font-16.png";
 const FONT_MAP: &'static str = "\
 ABCDEFGHIJKLMNOPQRSTUVWXYZ\
@@ -52,36 +54,14 @@ pub enum TileId {
     Ico = 60,
 }
 
-const CLOCK_TILES: [(u8, u8); 24] = [
-    (6, 30),
-    (5, 31),
-    (5, 31),
-    (7, 30),
-    (7, 31),
-    (7, 31),
-    (9, 30),
-    (9, 31),
-    (9, 31),
-    (9, 28),
-    (9, 29),
-    (9, 29),
-    (5, 30),
-    (10, 29),
-    (10, 29),
-    (10, 28),
-    (10, 31),
-    (10, 31),
-    (10, 30),
-    (8, 31),
-    (8, 31),
-    (8, 30),
-    (6, 31),
-    (6, 31),
-];
-
 /// Small alias for formatting Debug types
 fn p(t: impl std::fmt::Debug) -> String {
     format!("{:?}", t)
+}
+
+pub trait System: std::fmt::Debug {
+    fn update(&mut self, ctx: &mut Context, game: &mut Game) -> GameResult;
+    fn draw(&self, ctx: &mut Context, game: &Game) -> GameResult;
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -109,20 +89,20 @@ pub enum GameMode {
 #[derive(Debug)]
 pub struct Game {
     pub mode: GameMode,
+    pub ui: Ui,
     cursor: usize,
     status: String,
 }
 
-const NORMAL_MODE_STATUS: &str = "<Esc> to use prompt";
-
 impl Game {
-    pub fn new(_ctx: &mut Context) -> GameResult<Self> {
+    pub fn new(_ctx: &mut Context, ui: Ui) -> GameResult<Self> {
         let mode = GameMode::Normal;
         let cursor = 0;
         let status = String::new();
 
         Ok(Self {
             mode,
+            ui,
             cursor,
             status,
         })
@@ -182,7 +162,6 @@ impl Game {
     }
 
     pub fn get_prompt(&self) -> (usize, &str) {
-        // (self.cursor_pos, self.prompt_content)
         (self.cursor, &self.status)
     }
 
@@ -226,7 +205,7 @@ impl Game {
 
     pub fn get_status(&self) -> &str {
         match self.mode {
-            GameMode::Normal => NORMAL_MODE_STATUS,
+            GameMode::Normal => "",
             GameMode::Prompt => &self.status,
         }
     }

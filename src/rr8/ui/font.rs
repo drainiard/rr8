@@ -7,6 +7,7 @@ use ggez::nalgebra::Point2;
 
 use crate::*;
 
+#[derive(Debug)]
 pub struct Font {
     image: graphics::Image,
     font_map: HashMap<char, f32>,

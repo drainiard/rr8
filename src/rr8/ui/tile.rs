@@ -12,6 +12,7 @@ impl Into<u16> for TileId {
     }
 }
 
+#[derive(Debug)]
 pub struct TileLayout {
     path: &'static str,
     /// top-left, top-right, bottom-left, bottom-right, horiz, vert
@@ -24,6 +25,7 @@ impl TileLayout {
     }
 }
 
+#[derive(Debug)]
 pub struct TileMap {
     image: graphics::Image,
     layout: TileLayout,

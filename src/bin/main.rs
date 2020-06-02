@@ -4,7 +4,7 @@ use ggez::event;
 use ggez::graphics;
 
 use rr8::{
-    ui::{self, Scale, Ui},
+    ui::{prompt::Prompt, topbar::TopBar, Scale, Ui},
     Game, GameMode,
 };
 
@@ -22,27 +22,30 @@ struct MainState {
     game: Game,
     mode: MainMode,
     scale: f32,
-    ui: Ui,
     dt: u32,
 }
 
 impl MainState {
     fn new(ctx: &mut ggez::Context, scale: f32) -> ggez::GameResult<MainState> {
         let filter_mode = graphics::FilterMode::Nearest;
-        let game = Game::new(ctx)?;
         let mode = MainMode::Ready;
 
         let ui = Ui::new(ctx, filter_mode, scale)?;
+        let game = Game::new(ctx, ui)?;
 
         let s = MainState {
             game,
             mode,
             scale,
-            ui,
             dt: 0,
         };
 
         Ok(s)
+    }
+
+    fn switch_mode(&mut self, mode: GameMode) {
+        self.mode = MainMode::Switch;
+        self.game.mode = mode;
     }
 }
 
@@ -58,7 +61,7 @@ impl event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult {
         graphics::clear(ctx, (0, 0, 0).into());
 
-        let scale = self.ui.get_scale();
+        let scale = self.game.ui.get_scale();
         if self.scale != scale {
             self.scale = scale;
             let (w, h) = (WIN_W * scale, WIN_H * scale);
@@ -75,9 +78,9 @@ impl event::EventHandler for MainState {
         }
 
         // UI has its own delta time for animations and stuff
-        self.ui.dt = self.dt;
+        self.game.ui.dt = self.dt;
 
-        self.ui.draw_all(ctx, &self.game)?;
+        self.game.ui.draw_all(ctx, &self.game)?;
 
         graphics::present(ctx)?;
 
@@ -88,7 +91,7 @@ impl event::EventHandler for MainState {
 
     fn mouse_motion_event(&mut self, ctx: &mut ggez::Context, x: f32, y: f32, _dx: f32, _dy: f32) {
         ggez::input::mouse::set_cursor_hidden(ctx, true);
-        self.ui.set_mouse_coords((x, y));
+        self.game.ui.set_mouse_coords((x, y));
     }
 
     fn key_down_event(
@@ -102,18 +105,33 @@ impl event::EventHandler for MainState {
 
         println!("{:?}", (keymods, keycode));
 
+        // Mode-independent keys
+        let mut is_done = true;
+        match keycode {
+            event::KeyCode::F1 => self.switch_mode(GameMode::Normal),
+            event::KeyCode::F2 => self.switch_mode(GameMode::Prompt),
+            event::KeyCode::Escape => ggez::event::quit(ctx),
+            _ => {
+                is_done = false;
+            }
+        };
+
+        if is_done {
+            return;
+        }
+
         match self.game.mode {
             GameMode::Normal => {
                 match keycode {
-                    event::KeyCode::Escape => {
-                        self.mode = MainMode::Switch;
-                        self.game.mode = GameMode::Prompt;
-                    }
+                    event::KeyCode::Key0 => self.game.ui.set_scale(Scale::Default),
                     event::KeyCode::Add => {
-                        self.ui.set_scale(if logo { Scale::Max } else { Scale::Up })
+                        self.game
+                            .ui
+                            .set_scale(if logo { Scale::Max } else { Scale::Up })
                     }
                     event::KeyCode::Subtract => {
-                        self.ui
+                        self.game
+                            .ui
                             .set_scale(if logo { Scale::Min } else { Scale::Down })
                     }
                     _ => self.game.key_down(ctx, keycode, keymods),
@@ -161,10 +179,10 @@ pub fn main() -> ggez::GameResult {
 
     let state = &mut MainState::new(ctx, scale)?;
 
-    let prompt = ui::Prompt::default();
-    let top_bar = ui::TopBar::default();
-    state.ui.add_system(prompt);
-    state.ui.add_system(top_bar);
+    let prompt = Prompt::default();
+    let topbar = TopBar::default();
+    state.game.ui.add_system(prompt);
+    state.game.ui.add_system(topbar);
 
     event::run(ctx, event_loop, state)
 }

@@ -1,6 +1,9 @@
 pub mod font;
+pub mod mouse;
 pub mod palette;
+pub mod prompt;
 pub mod tile;
+pub mod topbar;
 
 use ggez::graphics;
 use ggez::graphics::{spritebatch::SpriteBatch, Rect};
@@ -10,6 +13,7 @@ use ggez::Context;
 
 use crate::*;
 use font::Font;
+use mouse::Mouse;
 use palette::Pal;
 use tile::{TileLayout, TileMap};
 
@@ -29,97 +33,7 @@ impl Scale {
     pub const MAX: f32 = Self::DELTA * 7.;
 }
 
-pub trait System {
-    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult;
-    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult;
-}
-
-#[derive(Debug, Default, Eq, PartialEq)]
-pub struct TopBar;
-
-impl System for TopBar {
-    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
-        todo!()
-    }
-
-    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
-        let default_color = Pal::Gray.dark();
-        let (bg, fg, ico, bg_color, fg_color) = match game.mode {
-            GameMode::Normal => (1, 5, 16, Pal::Black, default_color),
-            GameMode::Prompt => (1, 5, 16, Pal::Black, Pal::Green.into()),
-        };
-        ui.draw(ctx, &ui.tile_alt(bg, ico, fg_color, false)?, 1., 0.)?;
-        ui.draw(ctx, &ui.tile_alt(fg, ico, bg_color, false)?, 1., 0.)?;
-        ui.draw_text(ctx, &p(&game.mode).to_uppercase(), 2.5, 0., default_color)?;
-
-        ui.draw_text(ctx, &format!("x{}", ui.scale), 18., 0., Pal::Gray.darker())?;
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default, PartialEq)]
-pub struct Mouse {
-    coords: (f32, f32),
-}
-
-impl Mouse {
-    pub fn set_coords(&mut self, coords: (f32, f32)) {
-        self.coords = coords;
-    }
-}
-
-impl System for Mouse {
-    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
-        todo!()
-    }
-
-    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
-        if let GameMode::Normal = game.mode {
-            let (x, y) = self.coords;
-
-            let mouse = ui.tile_alt(9, 16, Pal::Orange, false)?;
-            let mouse_inner = ui.tile_alt(9, 19, Pal::Red, false)?;
-            let mouse_shadow = ui.tile_alt(9, 19, Pal::Black, false)?;
-            ui.draw_free(ctx, &mouse_shadow, x + 1., y + 2., ui.scale)?;
-            ui.draw_free(ctx, &mouse_inner, x, y, ui.scale)?;
-            ui.draw_free(ctx, &mouse, x, y, ui.scale)?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default, Eq, PartialEq)]
-pub struct Prompt;
-
-impl System for Prompt {
-    fn update(&mut self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
-        todo!()
-    }
-    fn draw(&self, ctx: &mut Context, ui: &Ui, game: &Game) -> GameResult {
-        let (prompt_color, prompt_text) = match &game.mode {
-            GameMode::Normal => (Pal::Gray.dark(), game.get_status()),
-            GameMode::Prompt => {
-                let column = if ui.dt & 0b100000 > 0 { 15 } else { 20 };
-                let beam = ui.tile8(TileId::Ico, column, Pal::Red, false)?;
-
-                let (cursor_pos, prompt) = game.get_prompt();
-
-                // this also works nice because drawing the beam before the
-                // prompt makes the char underneath it visible
-                ui.draw(ctx, &beam, 2. + cursor_pos as f32 / 2., 19.)?;
-
-                (Pal::LightGray.into(), prompt)
-            }
-        };
-        ui.draw_text(ctx, "#", 1., 19., Pal::Gray.dark())?;
-        ui.draw_text(ctx, prompt_text, 2., 19., prompt_color)?;
-
-        Ok(())
-    }
-}
-
+#[derive(Debug)]
 pub struct Ui {
     pub dt: u32,
     font: Font,
@@ -127,6 +41,7 @@ pub struct Ui {
     map2: TileMap,
     mouse: Mouse,
     scale: f32,
+    default_scale: f32,
     systems: Vec<Box<dyn System>>,
 }
 
@@ -169,6 +84,7 @@ impl Ui {
             map2,
             mouse,
             scale,
+            default_scale: scale,
             systems,
         })
     }
@@ -181,11 +97,11 @@ impl Ui {
         self.bg(ctx)?;
 
         for system in self.systems.iter() {
-            system.draw(ctx, self, game)?;
+            system.draw(ctx, game)?;
         }
 
         // draw mouse last so it's above everything else
-        self.mouse.draw(ctx, self, game)?;
+        self.mouse.draw(ctx, game)?;
 
         Ok(())
     }
@@ -364,7 +280,7 @@ impl Ui {
                 self.scale = Scale::MAX;
             }
             Scale::Default => {
-                self.scale = Scale::DEFAULT;
+                self.scale = self.default_scale;
             }
         }
     }
